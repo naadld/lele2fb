@@ -1,11 +1,15 @@
 /**
  * Cloudflare Worker: lele-facebook
- * Dedicated Serverless Engine for Facebook Fanpage, Group & Instagram Automation
+ * Dedicated Serverless Engine for Omni-Channel Social Publishing
  * 
- * Connected Channels on Buffer 2:
+ * Connected Channels:
+ * [Buffer 2]:
  * 1. Facebook Fanpage: Lê Lê học tiếng Trung (6a86bd12ccaf649a67dfcae9)
  * 2. Facebook Group:   Học tiếng Trung cùng Lê Lê (6a86bd97ccaf649a67dfcca8)
  * 3. Instagram:        lelehoctiengtrung (6a86beacccaf649a67dfcfba)
+ * [Buffer 3]:
+ * 4. Twitter / X:      leletiengtrung (6a86bfa7ccaf649a67dfd25c)
+ * 5. Pinterest:        lelehoctiengtrung (6a86c04dccaf649a67dfd464)
  */
 
 import { getFacebookConfig } from "./config.js";
@@ -37,17 +41,23 @@ export default {
     // 1. Health check endpoint
     if (url.pathname === "/" || url.pathname === "/health") {
       return new Response(JSON.stringify({
-        project: "LeLe Hoc Tieng Trung - Multi-Channel Community Engine",
+        project: "LeLe Hoc Tieng Trung - Omni-Channel Social Engine",
         worker: "lele-facebook",
         status: "Online (100% Serverless)",
-        channels: {
-          fanpage: env.BUFFER_CHANNEL_ID_FB ? "Connected" : "Pending",
-          group: env.BUFFER_CHANNEL_ID_GROUP ? "Connected" : "Pending",
-          instagram: env.BUFFER_CHANNEL_ID_IG ? "Connected" : "Pending"
+        connected_channels: {
+          buffer_2: {
+            fanpage: env.BUFFER_CHANNEL_ID_FB ? "Connected" : "Pending",
+            group: env.BUFFER_CHANNEL_ID_GROUP ? "Connected" : "Pending",
+            instagram: env.BUFFER_CHANNEL_ID_IG ? "Connected" : "Pending"
+          },
+          buffer_3: {
+            twitter_x: env.BUFFER_CHANNEL_ID_TWITTER ? "Connected" : "Pending",
+            pinterest: env.BUFFER_CHANNEL_ID_PINTEREST ? "Connected" : "Pending"
+          }
         },
         endpoints: {
           webhook: "/webhook (GET: Meta verification, POST: Event ingestion)",
-          triggerPost: "/api/trigger-doc-post (POST: Multi-channel publish)"
+          triggerPost: "/api/trigger-doc-post (POST: Omni-channel publish)"
         },
         time: new Date().toISOString()
       }, null, 2), {
@@ -84,7 +94,6 @@ export default {
                 const item = value.item;
                 const verb = value.verb;
 
-                // Detect new comments on page posts
                 if (item === "comment" && (verb === "add" || !verb)) {
                   const commentId = value.comment_id;
                   const commentMessage = value.message || "";
@@ -95,24 +104,24 @@ export default {
                   if (isDocumentRequest(commentMessage)) {
                     console.log(`[FB-AUTO-REPLY] Triggering Document Funnel for comment ${commentId}...`);
 
-                    // Step 1: Auto Like Comment
+                    // Auto Like Comment
                     if (config.fbPageAccessToken) {
                       await likeComment(config.fbPageAccessToken, commentId);
                     }
 
-                    // Step 2: Public Reply Comment
+                    // Public Reply Comment
                     const publicReplyText = `Dạ Lê Lê đã gửi link trọn bộ tài liệu qua tin nhắn cho bạn rồi nhé! ✨ Bạn nhớ kiểm tra hộp thư chờ và tham gia Group học tập để nhận thêm tài liệu mỗi tuần cùng Lê Lê nha: ${config.groupInviteUrl}`;
                     if (config.fbPageAccessToken) {
                       await replyToComment(config.fbPageAccessToken, commentId, publicReplyText);
                     }
 
-                    // Step 3: Private Reply via Messenger
+                    // Private Reply via Messenger
                     const privateMsgText = `Chào ${senderName} nha! Lê Lê gửi bạn trọn bộ tài liệu học tiếng Trung độc quyền nè: https://drive.google.com/drive/folders/1Y240J5-oXA-UDm2IKvp7qCBVsRempbCB\n\nChúc bạn học thật tốt! Đừng quên tham gia Group của chúng mình nhé: ${config.groupInviteUrl}`;
                     if (config.fbPageAccessToken) {
                       await sendPrivateReply(config.fbPageAccessToken, commentId, privateMsgText);
                     }
 
-                    // Step 4: Notify Telegram Bot 2
+                    // Notify Telegram Bot 2
                     await sendTelegramAlert(
                       config.telegramBotToken,
                       config.telegramChatId,
@@ -135,7 +144,7 @@ export default {
       }
     }
 
-    // 4. Trigger Document Post to Multi-Channels (POST /api/trigger-doc-post)
+    // 4. Trigger Multi-Channel Post (POST /api/trigger-doc-post)
     if (url.pathname === "/api/trigger-doc-post" && (request.method === "POST" || request.method === "GET")) {
       try {
         const postText = `📚 TỔNG HỢP BÍ KÍP TỰ HỌC TIẾNG TRUNG & BẢNG BẪY ÂM ĐIỆU PINYIN CHUẨN HSK\n\n` +
@@ -145,41 +154,51 @@ export default {
           `#lelehoctiengtrung #hoctiengtrung #pinyin #tiengtrungmoibatdau #hsk #tailieutiengtrung`;
 
         const results = {};
-        const token = env.BUFFER_ACCESS_TOKEN_2 || config.bufferAccessToken;
+        const token2 = env.BUFFER_ACCESS_TOKEN_2 || config.bufferAccessToken;
+        const token3 = env.BUFFER_ACCESS_TOKEN_3;
 
-        // 1. Post to Fanpage
-        if (token && env.BUFFER_CHANNEL_ID_FB) {
+        // [BUFFER 2 Channels]
+        // 1. Fanpage
+        if (token2 && env.BUFFER_CHANNEL_ID_FB) {
           try {
-            results.fanpage = await publishPostToBuffer(token, env.BUFFER_CHANNEL_ID_FB, postText, [], "facebook");
+            results.fanpage = await publishPostToBuffer(token2, env.BUFFER_CHANNEL_ID_FB, postText, [], "facebook");
           } catch (e) { results.fanpage_error = e.message; }
         }
 
-        // 2. Post to Group
-        if (token && env.BUFFER_CHANNEL_ID_GROUP) {
+        // 2. Group
+        if (token2 && env.BUFFER_CHANNEL_ID_GROUP) {
           try {
-            const groupText = `🎉 TÀI LIỆU MỚI CHO THÀNH VIÊN GROUP: BẢNG BẪY ÂM ĐIỆU PINYIN & MINIMAP HSK 1-3\n\n` +
-              `Chào cả nhà! Hôm nay Lê Lê gửi tặng các bạn tài liệu tổng hợp quy tắc biến âm và mẹo phân biệt các âm dễ nhầm lẫn nhé.\n\n` +
-              `Các bạn đang tự học gặp khó khăn ở âm nào nhất thì để lại comment bên dưới để Lê Lê hỗ trợ giải đáp nha! ✨`;
-            results.group = await publishPostToBuffer(token, env.BUFFER_CHANNEL_ID_GROUP, groupText, [], "facebook");
+            const groupText = `🎉 TÀI LIỆU MỚI: BẢNG BẪY ÂM ĐIỆU PINYIN & MINIMAP HSK 1-3\n\nChào cả nhà! Chúc mọi người học tiếng Trung thật vui và hiệu quả cùng Lê Lê! ✨`;
+            results.group = await publishPostToBuffer(token2, env.BUFFER_CHANNEL_ID_GROUP, groupText, [], "facebook");
           } catch (e) { results.group_error = e.message; }
         }
 
-        // 3. Post to Instagram
-        if (token && env.BUFFER_CHANNEL_ID_IG) {
+        // 3. Instagram
+        if (token2 && env.BUFFER_CHANNEL_ID_IG) {
           try {
             const igText = `Bảng Bẫy Âm Điệu Pinyin & 300 Từ Vựng HSK 1-3 🇨🇳✨\n\nFollow @lelehoctiengtrung để nhận thêm tài liệu học tiếng Trung mỗi ngày!\n\n#lelehoctiengtrung #hoctiengtrung #pinyin #hsk`;
-            results.instagram = await publishPostToBuffer(token, env.BUFFER_CHANNEL_ID_IG, igText, [], "instagram");
+            results.instagram = await publishPostToBuffer(token2, env.BUFFER_CHANNEL_ID_IG, igText, [], "instagram");
           } catch (e) { results.instagram_error = e.message; }
+        }
+
+        // [BUFFER 3 Channels]
+        // 4. Twitter / X
+        if (token3 && env.BUFFER_CHANNEL_ID_TWITTER) {
+          try {
+            const twitterText = `📚 Tự học tiếng Trung & Bảng bẫy âm điệu Pinyin chuẩn HSK 1-3!\n\n👇 Nhận trọn bộ Ebook & Audio luyện phát âm miễn phí cùng @leletiengtrung:\nhttps://facebook.com/groups/lelehoctiengtrung\n\n#lelehoctiengtrung #pinyin #tiengtrung`;
+            results.twitter = await publishPostToBuffer(token3, env.BUFFER_CHANNEL_ID_TWITTER, twitterText, [], "twitter");
+          } catch (e) { results.twitter_error = e.message; }
         }
 
         await sendTelegramAlert(
           config.telegramBotToken,
           config.telegramChatId,
-          `📢 <b>[Xuất Bản Đa Kênh - 14:00]</b>\n\n` +
+          `📢 <b>[Xuất Bản Đa Kênh Omni-Channel]</b>\n\n` +
           `📌 <b>Nội dung:</b> Chia sẻ tài liệu Pinyin & Mindmap HSK\n` +
           `📘 <b>Fanpage:</b> ${results.fanpage ? '✅ Đã lên lịch' : '⚠️ Bỏ qua'}\n` +
           `👥 <b>Group:</b> ${results.group ? '✅ Đã lên lịch' : '⚠️ Bỏ qua'}\n` +
-          `📸 <b>Instagram:</b> ${results.instagram ? '✅ Đã lên lịch' : '⚠️ Bỏ qua'}`
+          `📸 <b>Instagram:</b> ${results.instagram ? '✅ Đã lên lịch' : '⚠️ Bỏ qua'}\n` +
+          `🐦 <b>Twitter/X:</b> ${results.twitter ? '✅ Đã lên lịch' : '⚠️ Bỏ qua'}`
         );
 
         return new Response(JSON.stringify({ success: true, results: results }, null, 2), {
@@ -198,22 +217,28 @@ export default {
    */
   async scheduled(event, env, ctx) {
     const config = getFacebookConfig(env);
-    console.log(`[FB-CRON] Triggered cron at ${event.cron}...`);
+    console.log(`[FB-CRON] Triggered at ${event.cron}...`);
 
     if (event.cron === "0 7 * * *") {
-      const token = env.BUFFER_ACCESS_TOKEN_2 || config.bufferAccessToken;
+      const token2 = env.BUFFER_ACCESS_TOKEN_2 || config.bufferAccessToken;
+      const token3 = env.BUFFER_ACCESS_TOKEN_3;
+
       const postText = `📚 TỔNG HỢP BÍ KÍP TỰ HỌC TIẾNG TRUNG & BẢNG BẪY ÂM ĐIỆU PINYIN CHUẨN HSK\n\n` +
         `Các bạn mới học tiếng Trung thường rất dễ nhầm lẫn giữa các âm c/z, x/sh, q/ch và biến điệu của 不 (Bù/Bú) hay 一 (Yī/Yí/Yì).\n\n` +
         `Lê Lê đã tổng hợp đầy đủ sơ đồ tư duy Mindmap kèm bảng tra cứu Pinyin chi tiết và file nghe chuẩn bản xứ trong bộ tài liệu này! ✨\n\n` +
         `👇 Bình luận "TÀI LIỆU" bên dưới bài viết này, Lê Lê sẽ tự động gửi link tải trọn bộ miễn phí vào tin nhắn cho bạn ngay nhé! ❤️\n\n` +
         `#lelehoctiengtrung #hoctiengtrung #pinyin #tiengtrungmoibatdau #hsk #tailieutiengtrung`;
 
-      if (token && env.BUFFER_CHANNEL_ID_FB) {
-        await publishPostToBuffer(token, env.BUFFER_CHANNEL_ID_FB, postText, [], "facebook");
+      if (token2 && env.BUFFER_CHANNEL_ID_FB) {
+        await publishPostToBuffer(token2, env.BUFFER_CHANNEL_ID_FB, postText, [], "facebook");
       }
-      if (token && env.BUFFER_CHANNEL_ID_GROUP) {
+      if (token2 && env.BUFFER_CHANNEL_ID_GROUP) {
         const groupText = `🎉 TÀI LIỆU MỚI: BẢNG BẪY ÂM ĐIỆU PINYIN & MINIMAP HSK 1-3\n\nChúc cả nhà học tiếng Trung thật vui và hiệu quả cùng Lê Lê! ✨`;
-        await publishPostToBuffer(token, env.BUFFER_CHANNEL_ID_GROUP, groupText, [], "facebook");
+        await publishPostToBuffer(token2, env.BUFFER_CHANNEL_ID_GROUP, groupText, [], "facebook");
+      }
+      if (token3 && env.BUFFER_CHANNEL_ID_TWITTER) {
+        const twitterText = `📚 Tự học tiếng Trung & Bảng bẫy âm điệu Pinyin chuẩn HSK 1-3!\n\n👇 Tham gia nhóm học miễn phí cùng Lê Lê: https://facebook.com/groups/lelehoctiengtrung\n\n#lelehoctiengtrung #pinyin`;
+        await publishPostToBuffer(token3, env.BUFFER_CHANNEL_ID_TWITTER, twitterText, [], "twitter");
       }
     }
   }
