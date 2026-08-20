@@ -1,0 +1,9 @@
+
+# Documentation & Backups (Internal Only)
+docs/
+**/docs/
+README.md
+backup/
+**/backup/
+*.zip
+
