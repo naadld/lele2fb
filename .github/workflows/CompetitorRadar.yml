@@ -1,0 +1,36 @@
+name: Competitor Radar & Trend Scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run once a week on Sunday at 00:00 UTC (07:00 GMT+7)
+    - cron: '0 0 * * 0'
+
+jobs:
+  scan:
+    name: Competitor Intelligence Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Competitor Radar Scan
+        env:
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          TELEGRAM_BOT_TOKEN_FB: ${{ secrets.TELEGRAM_BOT_TOKEN_FB }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python src/competitor_radar.py

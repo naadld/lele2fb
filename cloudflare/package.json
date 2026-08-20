@@ -1,0 +1,14 @@
+{
+  "name": "lele-facebook",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker 2 for Facebook Fanpage & Group Automation (Meta Webhooks, Auto-Reply, Buffer 2)",
+  "main": "src/index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^4.124.0"
+  }
+}
